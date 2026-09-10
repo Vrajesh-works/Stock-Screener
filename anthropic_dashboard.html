@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Anthropic Exposure Screener &mdash; September 10, 2026 at 03:26 PM</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=DM+Sans:wght@400;500;700&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#08090d; color:#d1d5db; font-family:"DM Sans",sans-serif; line-height:1.5; }
+  .container { max-width:1180px; margin:0 auto; padding:20px 16px 60px; }
+  h1 { font-family:"Playfair Display",serif; font-size:36px; color:#f9fafb; margin-bottom:4px; }
+  .subtitle { color:#6b7280; font-size:14px; margin-bottom:20px; }
+  .disclaimer { background:#1f1205; border:1px solid #f9731644; border-radius:10px; padding:12px 16px; margin-bottom:24px; font-size:13px; color:#fdba74; }
+
+  .controls { background:#0d1117; border:1px solid #1e293b; border-radius:14px; padding:18px 20px; margin-bottom:24px; }
+  .controls-label { font-size:12px; color:#6b7280; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; }
+  .scenario-row { display:flex; flex-wrap:wrap; gap:8px; }
+  .scenario-btn { padding:8px 16px; border:1px solid #374151; border-radius:8px; background:#111827; color:#d1d5db; font-family:"JetBrains Mono",monospace; font-size:13px; cursor:pointer; transition:all 0.2s; }
+  .scenario-btn:hover { background:#1f2937; }
+  .scenario-btn.active { background:#22c55e; border-color:#22c55e; color:#000; font-weight:700; }
+  .scenario-hint { margin-top:10px; font-size:12px; color:#6b7280; }
+
+  .section-title { font-family:"Playfair Display",serif; font-size:22px; color:#f9fafb; margin:32px 0 12px; }
+  .tier-note { font-size:13px; color:#6b7280; margin-bottom:12px; }
+
+  table { width:100%; border-collapse:collapse; background:#0d1117; border-radius:12px; overflow:hidden; }
+  th { background:#111827; padding:10px 8px; text-align:left; font-size:11px; color:#9ca3af; text-transform:uppercase; letter-spacing:0.5px; font-weight:700; }
+  td { padding:10px 8px; font-size:13px; border-top:1px solid #161b22; vertical-align:middle; }
+  .mono { font-family:"JetBrains Mono",monospace; }
+  .tk { font-weight:700; font-size:15px; color:#818cf8; }
+  .score-pill { display:inline-block; padding:3px 10px; border-radius:12px; font-size:13px; font-weight:700; color:#000; font-family:"JetBrains Mono",monospace; }
+  .conf { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+
+  .card { background:#0d1117; border:1px solid #1e293b; border-radius:14px; padding:18px 20px; margin-bottom:14px; }
+  .card-head { display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .card-tk { font-family:"Playfair Display",serif; font-size:26px; font-weight:700; color:#f9fafb; }
+  .card-name { color:#9ca3af; font-size:14px; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; margin-bottom:12px; }
+  .kpi { background:#111827; border-radius:10px; padding:10px 12px; }
+  .kpi-label { display:block; font-size:11px; color:#6b7280; margin-bottom:3px; text-transform:uppercase; letter-spacing:0.5px; }
+  .kpi-val { font-family:"JetBrains Mono",monospace; font-size:19px; font-weight:700; color:#f9fafb; }
+  .bars { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:8px; margin-bottom:12px; }
+  .bar-row { font-size:12px; }
+  .bar-label { display:flex; justify-content:space-between; color:#9ca3af; margin-bottom:3px; }
+  .bar-track { height:6px; background:#1f2937; border-radius:3px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:3px; }
+  .note { font-size:13px; color:#9ca3af; border-left:2px solid #374151; padding-left:12px; margin-top:10px; }
+  .src { font-size:11px; color:#4b5563; margin-top:8px; font-family:"JetBrains Mono",monospace; }
+  .judgment-tag { font-size:10px; color:#f97316; text-transform:uppercase; letter-spacing:0.5px; }
+  .footer { margin-top:40px; padding-top:20px; border-top:1px solid #1e293b; font-size:12px; color:#4b5563; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Anthropic Exposure Screener</h1>
+  <div class="subtitle">Ranked by how much of each company's value is tied to Anthropic &middot; generated September 10, 2026 at 03:26 PM</div>
+
+  <div class="disclaimer">
+    <strong>Not investment advice.</strong> This is research tooling. Stake values are point-in-time
+    marks from SEC filings and sell-side estimates, and they go stale every quarter. Position sizing
+    is deliberately not addressed here &mdash; that is a question for a licensed advisor. The public
+    S-1 will change several of these inputs; re-verify before relying on any row.
+  </div>
+
+  <div class="controls">
+    <div class="controls-label">Anthropic valuation scenario</div>
+    <div class="scenario-row" id="scenarios"></div>
+    <div class="scenario-hint">
+      Equity stakes scale linearly from the Series H mark of $965B. Revenue exposure does not scale &mdash;
+      it is contracted or attributable sales, shown against market cap for comparison only.
+      The two units are not equivalent; read the exposure basis on each card.
+    </div>
+  </div>
+
+  <div class="section-title">Ranking</div>
+  <div class="tier-note">Weighted score: leverage 25%, valuation 20%, directness 20%, durability 15%, re-rating 10%, data quality 10%.</div>
+  <table>
+    <thead><tr>
+      <th>#</th><th>Ticker</th><th>Company</th><th>Tier</th>
+      <th>Exposure</th><th>Leverage</th><th>Fwd P/E</th><th>1Y</th><th>Data</th><th>Score</th>
+    </tr></thead>
+    <tbody id="ranking"></tbody>
+  </table>
+
+  <div class="section-title">Detail</div>
+  <div id="cards"></div>
+
+  <div class="footer">
+    Sources are noted per row. Equity marks: Amazon Q2 2026 10-Q, Alphabet Q2 2026 disclosure,
+    Zoom and Salesforce FQ2 2026 10-Qs. Revenue figures: Broadcom Q3 FY26 earnings call plus Mizuho
+    estimates, TeraWulf 8-K. SK Telecom, CoreWeave, Nvidia and Microsoft figures are estimates or
+    commitments, not marks. Research date 2026-09-10.<br><br>
+    The four judgment scores (directness, durability, re-rating, data quality) are hand-set analyst
+    inputs, not derived from market data. They encode a view and should be edited in
+    <span class="mono">anthropic_screener.py</span> if you disagree with it.
+  </div>
+</div>
+
+<script>
+const DATA = {"AVGO": {"ticker": "AVGO", "label": "Broadcom", "tier": "Core", "exposure_type": "revenue", "exposure_usd": 42000000000.0, "exposure_basis": "Est. FY2027 Anthropic-attributable revenue", "duration_years": 1, "mkt_cap": 1721363988480, "fwd_pe": 18.66574, "confidence": "estimate", "as_of": "2026-09", "source": "Mizuho est.; Broadcom Q3 FY26 call", "ownership": null, "cost_basis": null, "note": "CEO named Anthropic largest XPU customer 2027-28. 1GW Ironwood 2026, 5GW TPU v8i 2027, 10GW 2028. AI semi revenue guided 58B/115B/230B FY26-28.", "price": 361.815, "target": 533.4087, "upside_to_target": 47.4258115335185, "ret_1y": -1.3319931219339503, "is_live": true, "mkt_cap_is_live": true, "fwd_pe_is_live": true, "directness": 95, "durability": 95, "rerating": 70, "data_quality": 70}, "AMZN": {"ticker": "AMZN", "label": "Amazon", "tier": "Core", "exposure_type": "equity", "exposure_usd": 190400000000.0, "exposure_basis": "Convertible notes 97.9B plus nonvoting preferred 92.5B", "duration_years": null, "mkt_cap": 2713620578304, "fwd_pe": 24.18964, "confidence": "filing", "as_of": "2026-06-30", "source": "Q2 2026 10-Q", "ownership": "15-21 pct (disputed)", "cost_basis": 13000000000.0, "note": "Q2 pre-tax Anthropic gain of 53.4B was ~66 pct of pre-tax income, above operating profit. Also >100B AWS commitment, Project Rainier, 1M+ Trainium2.", "price": 251.58, "target": 328.1707, "upside_to_target": 30.44387471182129, "ret_1y": 9.230232422101043, "is_live": true, "mkt_cap_is_live": true, "fwd_pe_is_live": true, "directness": 90, "durability": 85, "rerating": 95, "data_quality": 85}, "GOOGL": {"ticker": "GOOGL", "label": "Alphabet", "tier": "Core", "exposure_type": "equity", "exposure_usd": 124300000000.0, "exposure_basis": "Private company holdings, primarily Anthropic", "duration_years": null, "mkt_cap": 4064424493056, "fwd_pe": 22.343546, "confidence": "filing", "as_of": "2026-06-30", "source": "Q2 2026 disclosure", "ownership": "~14 pct, capped at 15", "cost_basis": 3000000000.0, "note": "Triple transmission: equity, designs the TPUs, and Google Cloud hosts. Stake contractually capped so it cannot grow. No voting rights or board seats.", "price": 332.3341, "target": 428.06668, "upside_to_target": 28.806126124282777, "ret_1y": 39.31903151848645, "is_live": true, "mkt_cap_is_live": true, "fwd_pe_is_live": true, "directness": 95, "durability": 90, "rerating": 85, "data_quality": 90}, "ZM": {"ticker": "ZM", "label": "Zoom", "tier": "Core", "exposure_type": "equity", "exposure_usd": 3130000000.0, "exposure_basis": "Series C investment, marked to Series H", "duration_years": null, "mkt_cap": 28005402624, "fwd_pe": 15.145205, "confidence": "filing", "as_of": "2026-07-31", "source": "FQ2 2026 10-Q", "ownership": null, "cost_basis": 51000000.0, "note": "Net cash 7.19B (24.64/sh) plus stake 3.13B is ~37 pct of market cap. WARNING: trailing P/E of ~9x is inflated by the Anthropic markup. Use forward.", "price": 95.98, "target": 118.24, "upside_to_target": 23.192331735778275, "ret_1y": 14.575632330382579, "is_live": true, "mkt_cap_is_live": true, "fwd_pe_is_live": true, "directness": 70, "durability": 40, "rerating": 75, "data_quality": 95}, "SKM": {"ticker": "SKM", "label": "SK Telecom", "tier": "Core", "exposure_type": "equity", "exposure_usd": 1900000000.0, "exposure_basis": "Midpoint of 1.2-2.6B range; BofA marks at KRW 1.7tn", "duration_years": null, "mkt_cap": 14230803456, "fwd_pe": 13.772325, "confidence": "estimate", "as_of": "2026", "source": "Sell-side estimates (0.27-0.40 pct ownership)", "ownership": "0.27-0.40 pct (est.)", "cost_basis": 100000000.0, "note": "Highest leverage in the theme, worst entry price. Already re-rated hard. New Street and UBS both at Neutral. ~6B net debt. Stake size still an estimate.", "price": 37.07, "target": 35.0, "upside_to_target": -5.584030213110332, "ret_1y": 70.75081187514782, "is_live": true, "mkt_cap_is_live": true, "fwd_pe_is_live": true, "directness": 70, "durability": 40, "rerating": 80, "data_quality": 40}, "CRM": {"ticker": "CRM", "label": "Salesforce", "tier": "Bench", "exposure_type": "equity", "exposure_usd": 5100000000.0, "exposure_basis": "45 pct of strategic investment portfolio", "duration_years": null, "mkt_cap": 200063074304, "fwd_pe": 15.185371, "confidence": "filing", "as_of": "2026-07-31", "source": "FQ2 2026 10-Q", "ownership": null, "cost_basis": 50000000.0, "note": "Benched on leverage: only ~2 pct of market cap. Drove 2.7B of gains in FQ2.", "price": 243.09, "target": 273.37314, "upside_to_target": 12.457583611008257, "ret_1y": 1.06255220475919, "is_live": true, "mkt_cap_is_live": true, "fwd_pe_is_live": true, "directness": 75, "durability": 60, "rerating": 60, "data_quality": 95}, "WULF": {"ticker": "WULF", "label": "TeraWulf", "tier": "Bench", "exposure_type": "revenue", "exposure_usd": 19000000000.0, "exposure_basis": "Total contracted revenue, 20-year Anthropic lease", "duration_years": 20, "mkt_cap": 8120714752, "fwd_pe": -67.8125, "confidence": "filing", "as_of": "2026-07", "source": "8-K / company release", "ownership": null, "cost_basis": null, "note": "Best contracted-revenue leverage anywhere: 19B backlog against a ~9B market cap. Benched on risk class - bitcoin miner pivoting to HPC, 52wk 4.69-29.82.", "price": 16.275, "target": 35.475, "upside_to_target": 117.97235023041478, "ret_1y": 54.26539643879033, "is_live": true, "mkt_cap_is_live": true, "fwd_pe_is_live": true, "directness": 95, "durability": 80, "rerating": 70, "data_quality": 85}, "CRWV": {"ticker": "CRWV", "label": "CoreWeave", "tier": "Cut", "exposure_type": "revenue", "exposure_usd": 5500000000.0, "exposure_basis": "Midpoint of 4-7B est. over 5 years; terms undisclosed", "duration_years": 5, "mkt_cap": 49412161536, "fwd_pe": -45.976597, "confidence": "estimate", "as_of": "2026-04", "source": "Wells Fargo / Citi / Morgan Stanley est.", "ownership": null, "cost_basis": null, "note": "Anthropic is ~5 pct of a 104.2B backlog dominated by Microsoft. Three customers are 72 pct of revenue. 35.6B debt at 9.0 pct, 640M quarterly interest.", "price": 89.59, "target": 144.45714, "upside_to_target": 61.24248241991294, "ret_1y": -23.518869041578963, "is_live": true, "mkt_cap_is_live": true, "fwd_pe_is_live": true, "directness": 50, "durability": 55, "rerating": 40, "data_quality": 35}, "MU": {"ticker": "MU", "label": "Micron", "tier": "Cut", "exposure_type": "revenue", "exposure_usd": null, "exposure_basis": "Multi-year HBM/DRAM/SSD supply plus Series H equity, undisclosed", "duration_years": null, "mkt_cap": 1109346484224, "fwd_pe": 6.3360653, "confidence": "undisclosed", "as_of": "2026-06-22", "source": "Company release", "ownership": null, "cost_basis": null, "note": "Real agreement but unquantifiable. ~1T market cap after a ~900 pct one-year run.", "price": 982.25, "target": 1513.1111, "upside_to_target": 54.04541613642149, "ret_1y": 602.6761027106429, "is_live": true, "mkt_cap_is_live": true, "fwd_pe_is_live": true, "directness": 60, "durability": 70, "rerating": 40, "data_quality": 25}, "NVDA": {"ticker": "NVDA", "label": "Nvidia", "tier": "Cut", "exposure_type": "equity", "exposure_usd": 10000000000.0, "exposure_basis": "Up to 10B committed Nov 2025; deployment schedule unclear", "duration_years": null, "mkt_cap": 5272618139648, "fwd_pe": 14.02631, "confidence": "estimate", "as_of": "2025-11-18", "source": "Company announcement", "ownership": null, "cost_basis": null, "note": "Both investor and supplier. Circular: invests in Anthropic, which buys its compute.", "price": 218.355, "target": 327.6544, "upside_to_target": 50.05582652103227, "ret_1y": 23.30741378563112, "is_live": true, "mkt_cap_is_live": true, "fwd_pe_is_live": true, "directness": 60, "durability": 85, "rerating": 30, "data_quality": 60}, "MSFT": {"ticker": "MSFT", "label": "Microsoft", "tier": "Cut", "exposure_type": "equity", "exposure_usd": 5000000000.0, "exposure_basis": "Up to 5B committed Nov 2025", "duration_years": null, "mkt_cap": 3642559299584, "fwd_pe": 20.8096, "confidence": "estimate", "as_of": "2025-11-18", "source": "Company announcement", "ownership": null, "cost_basis": null, "note": "Anthropic committed 30B of Azure purchases against a 5B investment.", "price": 490.5443, "target": 572.91516, "upside_to_target": 16.791727067259774, "ret_1y": -1.157073316032402, "is_live": true, "mkt_cap_is_live": true, "fwd_pe_is_live": true, "directness": 50, "durability": 80, "rerating": 30, "data_quality": 60}, "MS": {"ticker": "MS", "label": "Morgan Stanley", "tier": "Cut", "exposure_type": "revenue", "exposure_usd": null, "exposure_basis": "Left-lead underwriting fees, undisclosed", "duration_years": null, "mkt_cap": 334797471744, "fwd_pe": 15.625577, "confidence": "undisclosed", "as_of": "2026-09", "source": "Press reports", "ownership": null, "cost_basis": null, "note": "Left lead on possibly the largest IPO ever, plus the ~15B revolver. A fee event.", "price": 213.1699, "target": 237.33333, "upside_to_target": 11.335291708632399, "ret_1y": 41.449750534424446, "is_live": true, "mkt_cap_is_live": true, "fwd_pe_is_live": true, "directness": 60, "durability": 20, "rerating": 50, "data_quality": 50}, "SNOW": {"ticker": "SNOW", "label": "Snowflake", "tier": "Cut", "exposure_type": "revenue", "exposure_usd": 200000000.0, "exposure_basis": "Multi-year Claude distribution agreement", "duration_years": 3, "mkt_cap": 117059035136, "fwd_pe": 110.5812, "confidence": "filing", "as_of": "2025-12", "source": "Company announcement", "ownership": null, "cost_basis": null, "note": "200M deal putting Claude in front of 12,600+ Snowflake customers.", "price": 331.8, "target": 413.2875, "upside_to_target": 24.559222423146476, "ret_1y": 46.91165766047942, "is_live": true, "mkt_cap_is_live": true, "fwd_pe_is_live": true, "directness": 55, "durability": 50, "rerating": 30, "data_quality": 80}};
+const SCENARIOS = [["Series H (965B)", 965000000000.0], ["1.2T", 1200000000000.0], ["1.5T", 1500000000000.0], ["2T", 2000000000000.0]];
+const MARK_BASE = 965000000000.0;
+const W = {leverage:0.25, valuation:0.20, directness:0.20, durability:0.15, rerating:0.10, data_quality:0.10};
+const CONF = {filing:["SEC filing","#22c55e"], estimate:["Sell-side est.","#fbbf24"], undisclosed:["Undisclosed","#ef4444"]};
+let current = MARK_BASE;
+
+function fmtNum(v, prefix) {
+  if (v === null || v === undefined) return "N/A";
+  prefix = prefix || "";
+  const a = Math.abs(v);
+  if (a >= 1e12) return prefix + (v/1e12).toFixed(2) + "T";
+  if (a >= 1e9) return prefix + (v/1e9).toFixed(1) + "B";
+  if (a >= 1e6) return prefix + (v/1e6).toFixed(0) + "M";
+  return prefix + v.toFixed(2);
+}
+function fmtPct(v) { return (v === null || v === undefined) ? "N/A" : v.toFixed(1) + "%"; }
+function fmtSigned(v) { return (v === null || v === undefined) ? "N/A" : (v >= 0 ? "+" : "") + v.toFixed(1) + "%"; }
+
+function scaledExposure(d, val) {
+  if (d.exposure_usd === null) return null;
+  return d.exposure_type === "equity" ? d.exposure_usd * (val / MARK_BASE) : d.exposure_usd;
+}
+// Revenue is a flow, so a multi-year total is divided to an annual run-rate.
+// Equity is a balance-sheet asset, so the full stake counts.
+function annualExposure(d, val) {
+  const total = scaledExposure(d, val);
+  if (total === null) return null;
+  if (d.exposure_type === "equity") return total;
+  return total / (d.duration_years || 1);
+}
+function leverage(d, val) {
+  const e = annualExposure(d, val);
+  if (e === null || !d.mkt_cap) return null;
+  return (e / d.mkt_cap) * 100;
+}
+function scoreMetric(v, lo, hi, invert) {
+  if (v === null || v === undefined) return 50;
+  let n = (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo);
+  if (invert) n = 1 - n;
+  return Math.round(n * 100);
+}
+// A negative forward P/E is forward losses, not a bargain.
+function scoreValuation(fwdPe) {
+  if (fwdPe === null || fwdPe === undefined) return 50;
+  if (fwdPe <= 0) return 15;
+  return scoreMetric(fwdPe, 10, 45, true);
+}
+function totalScore(d, val) {
+  const lev = scoreMetric(leverage(d, val), 0, 25, false);
+  return Math.round(lev*W.leverage + scoreValuation(d.fwd_pe)*W.valuation
+    + d.directness*W.directness + d.durability*W.durability
+    + d.rerating*W.rerating + d.data_quality*W.data_quality);
+}
+function badge(s) {
+  if (s >= 75) return ["Top exposure","#22c55e"];
+  if (s >= 60) return ["Strong","#a3e635"];
+  if (s >= 45) return ["Moderate","#fbbf24"];
+  if (s >= 30) return ["Weak","#f97316"];
+  return ["Negligible","#ef4444"];
+}
+function levColor(v) {
+  if (v === null) return "#6b7280";
+  if (v >= 15) return "#22c55e";
+  if (v >= 7) return "#a3e635";
+  if (v >= 3) return "#fbbf24";
+  return "#f97316";
+}
+
+function render() {
+  const rows = Object.values(DATA).map(function(d) {
+    const s = totalScore(d, current);
+    return {d:d, score:s, lev:leverage(d, current), exp:scaledExposure(d, current),
+            ann:annualExposure(d, current), badge:badge(s)};
+  }).sort(function(a,b) { return b.score - a.score; });
+
+  document.getElementById("ranking").innerHTML = rows.map(function(r,i) {
+    const d = r.d, c = CONF[d.confidence];
+    return '<tr>'
+      + '<td class="mono" style="color:#6b7280">' + (i+1) + '</td>'
+      + '<td><a href="#c-' + d.ticker + '" class="tk" style="text-decoration:none">' + d.ticker + '</a></td>'
+      + '<td style="color:#9ca3af">' + d.label + '</td>'
+      + '<td style="color:#6b7280;font-size:12px">' + d.tier + '</td>'
+      + '<td class="mono">' + fmtNum(r.ann,"$") + ' <span style="color:#4b5563;font-size:11px">' + d.exposure_type + (d.duration_years > 1 ? "/yr" : "") + '</span></td>'
+      + '<td class="mono" style="color:' + levColor(r.lev) + ';font-weight:700">' + fmtPct(r.lev) + '</td>'
+      + '<td class="mono">' + (d.fwd_pe ? d.fwd_pe.toFixed(1)+"x" : "N/A") + '</td>'
+      + '<td class="mono" style="color:' + (d.ret_1y >= 0 ? "#22c55e" : "#ef4444") + '">' + fmtSigned(d.ret_1y) + '</td>'
+      + '<td><span class="conf" style="background:' + c[1] + '22;color:' + c[1] + '">' + c[0] + '</span></td>'
+      + '<td><span class="score-pill" style="background:' + r.badge[1] + '">' + r.score + '</span></td>'
+      + '</tr>';
+  }).join("");
+
+  document.getElementById("cards").innerHTML = rows.map(function(r) {
+    const d = r.d, c = CONF[d.confidence];
+    const bars = [
+      ["Leverage (computed)", scoreMetric(r.lev,0,25,false), false],
+      ["Valuation (computed)", scoreValuation(d.fwd_pe), false],
+      ["Directness", d.directness, true],
+      ["Durability", d.durability, true],
+      ["Re-rating trigger", d.rerating, true],
+      ["Data quality", d.data_quality, true]
+    ];
+    const barHtml = bars.map(function(b) {
+      return '<div class="bar-row"><div class="bar-label"><span>' + b[0]
+        + (b[2] ? ' <span class="judgment-tag">judgment</span>' : '')
+        + '</span><span class="mono">' + b[1] + '</span></div>'
+        + '<div class="bar-track"><div class="bar-fill" style="width:' + b[1] + '%;background:' + badge(b[1])[1] + '"></div></div></div>';
+    }).join("");
+    return '<div class="card" id="c-' + d.ticker + '">'
+      + '<div class="card-head">'
+      + '<span class="card-tk">' + d.ticker + '</span>'
+      + '<span class="card-name">' + d.label + '</span>'
+      + '<span class="score-pill" style="background:' + r.badge[1] + '">' + r.score + ' &middot; ' + r.badge[0] + '</span>'
+      + '<span class="conf" style="background:' + c[1] + '22;color:' + c[1] + '">' + c[0] + ' &middot; ' + d.as_of + '</span>'
+      + '</div><div class="kpis">'
+      + '<div class="kpi"><span class="kpi-label">Exposure' + (d.duration_years > 1 ? " (total)" : "") + '</span><span class="kpi-val">' + fmtNum(r.exp,"$") + '</span></div>'
+      + (d.duration_years > 1 ? '<div class="kpi"><span class="kpi-label">Annualized</span><span class="kpi-val">' + fmtNum(r.ann,"$") + '</span></div>' : '')
+      + '<div class="kpi"><span class="kpi-label">Market cap</span><span class="kpi-val">' + fmtNum(d.mkt_cap,"$") + '</span></div>'
+      + '<div class="kpi"><span class="kpi-label">Leverage</span><span class="kpi-val" style="color:' + levColor(r.lev) + '">' + fmtPct(r.lev) + '</span></div>'
+      + '<div class="kpi"><span class="kpi-label">Fwd P/E</span><span class="kpi-val">' + (d.fwd_pe ? d.fwd_pe.toFixed(1)+"x" : "N/A") + '</span></div>'
+      + '<div class="kpi"><span class="kpi-label">Cons. target</span><span class="kpi-val">' + (d.target ? "$"+d.target.toFixed(0) : "N/A") + '</span></div>'
+      + '<div class="kpi"><span class="kpi-label">To target</span><span class="kpi-val">' + fmtSigned(d.upside_to_target) + '</span></div>'
+      + '</div><div class="bars">' + barHtml + '</div>'
+      + '<div class="note">' + d.note + '</div>'
+      + '<div class="src">Basis: ' + d.exposure_basis + ' &middot; Source: ' + d.source
+      + (d.ownership ? ' &middot; Ownership: ' + d.ownership : '')
+      + (d.cost_basis ? ' &middot; Cost basis: ' + fmtNum(d.cost_basis,"$") : '')
+      + (!d.mkt_cap_is_live ? ' &middot; MARKET CAP FROM RESEARCH FALLBACK, NOT LIVE' : '')
+      + '</div></div>';
+  }).join("");
+}
+
+document.getElementById("scenarios").innerHTML = SCENARIOS.map(function(s) {
+  return '<button class="scenario-btn' + (s[1] === MARK_BASE ? " active" : "")
+    + '" data-val="' + s[1] + '">' + s[0] + '</button>';
+}).join("");
+document.querySelectorAll(".scenario-btn").forEach(function(b) {
+  b.addEventListener("click", function() {
+    current = parseFloat(b.dataset.val);
+    document.querySelectorAll(".scenario-btn").forEach(function(x) { x.classList.remove("active"); });
+    b.classList.add("active");
+    render();
+  });
+});
+render();
+</script>
+</body>
+</html>
