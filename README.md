@@ -26,6 +26,33 @@ Data is refreshed by re-running the screener; the dashboard is dated with the ru
 
 Tickers are grouped into thematic sectors (Energy, Memory, Production + Operation, Decision + Chaos, Automation) covering names like NVDA, AMD, TSM, MSFT, GOOGL, TSLA, and META. Edit the `SECTORS` dict in `screener.py` to screen your own tickers.
 
+## Terminal features
+
+The dashboard is a Bloomberg-style terminal with:
+
+- **Ticker tape + market monitor** - live-scrolling watchlist, S&P 500 / Nasdaq / Dow / Russell 2000 / VIX
+- **Sortable blotter** - click any header to sort; sparklines in every row
+- **Screener filters** - filter by score, P/E, market cap, dividend yield, sector, rating
+- **Compare mode** - check 2-4 stocks for a side-by-side stat sheet and overlaid normalized charts
+- **Chart timeframes** - 1M / 3M / 6M / 1Y / 5Y views on every security detail chart
+- **Candlesticks** - toggle between line and OHLC candle rendering
+- **Analyst consensus** - price target range, mean target, recommendation, analyst count
+- **Add any ticker** - type any US symbol for live price data via Stooq (price data only, no fundamentals)
+- **CSV export** - download the filtered blotter
+- **Security detail** - click any row for stats grid, quant model breakdown, catalysts/risks, quarterly earnings
+- **Keyboard** - `1/2/3` switch views, `/` focuses search, `Esc` closes panels
+
+## Refreshing the data
+
+```bash
+pip install yfinance
+python screener.py
+```
+
+Then upload the regenerated `index.html` to the repo (GitHub web UI: Add file > Upload files).
+`SECTORS` in `screener.py` defines the coverage universe; add tickers there for full
+quant scoring. All data via yfinance (free, no API key).
+
 ## Disclaimer
 
 For educational purposes only. Not financial advice.
