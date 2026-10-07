@@ -344,6 +344,145 @@ def color_tag(val, thresholds=(0, 20, 50), invert=False):
     return "#ef4444"
 
 
+TERM_CSS = """
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--amber:#ffa02f;--amber-dk:#6e4a15;--up:#3ddc84;--dn:#ff5252;--tx:#d8d8d8;--dim:#7c7c7c;--line:#1b1b1b;--panel:#050505}
+html{background:#000}
+body{background:#000;color:var(--tx);font-family:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased}
+a{color:var(--amber)}
+.term-top{background:var(--amber);color:#000;font-weight:700;padding:6px 14px;display:flex;justify-content:space-between;align-items:center;font-size:13px;letter-spacing:1px}
+.term-top .rt{font-weight:400;font-size:12px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#000;margin-right:6px;animation:blink 1.6s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.tape-wrap{border-bottom:1px solid var(--amber-dk);overflow:hidden;white-space:nowrap;background:#000}
+.tape{display:inline-block;padding:6px 0;animation:tape 70s linear infinite;will-change:transform}
+.tape-wrap:hover .tape{animation-play-state:paused}
+@keyframes tape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.titem{display:inline-block;padding:0 20px;border-right:1px solid var(--line);font-size:12px}
+.titem b{color:var(--amber)}
+.mkt{display:flex;border-bottom:1px solid var(--line);background:var(--panel);flex-wrap:wrap}
+.mcell{padding:8px 18px;border-right:1px solid var(--line);font-size:12px}
+.mcell .n{color:var(--dim);font-size:10px;letter-spacing:1px;display:block}
+.mcell .p{font-size:15px;font-weight:700}
+.funcbar{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--line);background:#000;position:sticky;top:0;z-index:20;flex-wrap:wrap}
+.fbtn{background:#000;border:1px solid var(--amber-dk);color:var(--amber);padding:6px 14px;cursor:pointer;font:inherit;font-size:12px;letter-spacing:1px}
+.fbtn.on,.fbtn:hover{background:var(--amber);color:#000;font-weight:700}
+.fkey{opacity:.6;margin-right:6px}
+.search{margin-left:auto;background:#050505;border:1px solid var(--line);color:var(--tx);padding:7px 12px;font:inherit;font-size:12px;width:280px}
+.search:focus{outline:none;border-color:var(--amber-dk)}
+.wrap{padding:0 14px 60px;max-width:1560px;margin:0 auto}
+table.blot{width:100%;border-collapse:collapse;font-size:12px}
+table.blot thead th{position:sticky;top:53px;background:#0a0a0a;color:var(--amber);text-align:right;padding:9px 10px;border-bottom:1px solid var(--amber-dk);white-space:nowrap;font-weight:700;font-size:11px;letter-spacing:1px;cursor:pointer;z-index:10}
+table.blot thead th.l,table.blot td.l{text-align:left}
+table.blot thead th:hover{color:#fff}
+table.blot td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+table.blot tbody tr{cursor:pointer}
+table.blot tbody tr:hover{background:#101010}
+.ticker{color:var(--amber);font-weight:700}
+.up{color:var(--up)}.dn{color:var(--dn)}.dim{color:var(--dim)}
+.sect-hd td{background:#0a0a0a!important;color:var(--amber);font-weight:700;letter-spacing:2px;font-size:11px;cursor:default!important}
+.rtg{font-weight:700;padding:2px 8px;border:1px solid currentColor;font-size:11px;white-space:nowrap}
+.sect-block{margin:18px 0 28px;border:1px solid var(--line)}
+.sect-block-h{background:#0a0a0a;color:var(--amber);padding:8px 14px;font-weight:700;letter-spacing:2px;font-size:12px;border-bottom:1px solid var(--line)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:14px}
+.chip{border:1px solid var(--amber-dk);padding:8px 12px;cursor:pointer;font-size:12px;background:#000}
+.chip:hover{background:#141414}
+.chip b{color:var(--amber);margin-right:8px}
+.chip .sc{font-weight:700}
+.pick{display:grid;grid-template-columns:44px 90px 1fr 220px 130px 90px;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+.pick:hover{background:#101010}
+.pick .rk{color:var(--dim);font-size:12px}
+.bar{height:10px;background:#161616;position:relative}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--amber)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:50;overflow:auto;padding:28px 16px;display:none}
+.dpanel{max-width:1120px;margin:0 auto;background:#000;border:1px solid var(--amber-dk);display:none}
+.d-head{background:var(--amber);color:#000;padding:9px 16px;font-weight:700;display:flex;gap:14px;align-items:baseline;font-size:15px}
+.d-head .nm{font-weight:400;font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.d-head button{background:#000;color:var(--amber);border:none;font:inherit;font-weight:700;padding:4px 14px;cursor:pointer}
+.d-sec{border-bottom:1px solid var(--line);padding:16px}
+.d-sec-t{color:var(--amber);font-size:11px;letter-spacing:2px;margin-bottom:12px;font-weight:700}
+.d-price{font-size:30px;font-weight:700}
+.d-price .chg{font-size:16px;margin-left:12px}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
+.stat{background:#000;padding:9px 12px}
+.stat .k{font-size:10px;color:var(--dim);letter-spacing:1px}
+.stat .v{font-size:14px;font-weight:700;margin-top:2px}
+.mrow{display:grid;grid-template-columns:170px 1fr 52px;gap:12px;align-items:center;margin-bottom:10px;font-size:12px}
+.mrow .bl{color:var(--dim)}
+.mbar{height:12px;background:#141414;position:relative}
+.mbar i{position:absolute;left:0;top:0;bottom:0}
+.mrow .nv{text-align:right;font-weight:700}
+.d2{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line)}
+.d2>div{padding:14px}
+.d2>div:first-child{border-right:1px solid var(--line)}
+.ci{border:1px solid var(--line);padding:8px 12px;margin-bottom:8px;font-size:12px;display:flex;justify-content:space-between;gap:10px}
+.ci .sev{font-size:10px;letter-spacing:1px;flex-shrink:0}
+table.q{width:100%;border-collapse:collapse;font-size:12px}
+table.q th{text-align:left;color:var(--dim);font-size:10px;letter-spacing:1px;padding:8px 10px;border-bottom:1px solid var(--line);font-weight:400}
+table.q td{padding:8px 10px;border-bottom:1px solid var(--line)}
+.verdict{border-left:3px solid var(--amber);padding:4px 0 4px 14px;font-size:13px;line-height:1.7}
+.statusbar{position:fixed;left:0;right:0;bottom:0;background:#0a0a0a;border-top:1px solid var(--amber-dk);color:var(--dim);font-size:11px;padding:6px 14px;display:flex;justify-content:space-between;z-index:40}
+.statusbar b{color:var(--amber);font-weight:400}
+.hint{color:var(--dim);font-size:11px;padding:10px 0}
+@media(max-width:900px){.d2{grid-template-columns:1fr}.d2>div:first-child{border-right:none;border-bottom:1px solid var(--line)}.pick{grid-template-columns:36px 70px 1fr 90px}}
+"""
+
+TERM_JS = """
+function tab(n){
+  ['all','top','sec'].forEach(function(t){
+    document.getElementById('tab-'+t).style.display = t===n?'':'none';
+  });
+  document.querySelectorAll('.fbtn').forEach(function(b){
+    b.classList.toggle('on', b.dataset.tab===n);
+  });
+}
+document.addEventListener('keydown',function(e){
+  if(e.key==='1')tab('all');
+  else if(e.key==='2')tab('top');
+  else if(e.key==='3')tab('sec');
+  else if(e.key==='Escape')closeD();
+  else if(e.key==='/'){e.preventDefault();document.getElementById('q').focus();}
+});
+var sortDir={};
+function sortBy(th){
+  var i=+th.dataset.i, type=th.dataset.t, tb=document.getElementById('blot-body');
+  var rows=Array.prototype.slice.call(tb.rows);
+  var dir=sortDir[i]==='a'?'d':'a'; sortDir[i]=dir;
+  rows.sort(function(a,b){
+    var av=a.cells[i].dataset.v, bv=b.cells[i].dataset.v;
+    var c = type==='n' ? (parseFloat(av)-parseFloat(bv)) : (''+av).localeCompare(''+bv);
+    return dir==='a'?c:-c;
+  });
+  rows.forEach(function(r){tb.appendChild(r);});
+  document.querySelectorAll('#blot-head th').forEach(function(h){h.textContent=h.textContent.replace(/ [▲▼]$/,'');});
+  th.textContent+=' '+(dir==='a'?'▲':'▼');
+}
+function openD(t){
+  document.getElementById('ovl').style.display='block';
+  document.querySelectorAll('.dpanel').forEach(function(p){p.style.display='none';});
+  var p=document.getElementById('d-'+t);
+  if(p){p.style.display='block';}
+  document.getElementById('ovl').scrollTop=0;
+}
+function closeD(){document.getElementById('ovl').style.display='none';}
+document.getElementById('ovl').addEventListener('click',function(e){if(e.target===this)closeD();});
+document.getElementById('q').addEventListener('input',function(e){
+  var q=e.target.value.trim().toUpperCase();
+  document.querySelectorAll('#blot-body tr').forEach(function(r){
+    if(r.className==='sect-hd')return;
+    var t=(r.dataset.ticker||'')+' '+(r.dataset.name||'');
+    r.style.display = !q || t.toUpperCase().indexOf(q)>=0 ? '' : 'none';
+  });
+});
+function tick(){
+  var d=new Date();
+  var el=document.getElementById('clock');
+  if(el){el.textContent=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2);}
+}
+setInterval(tick,1000);tick();
+"""
+
+
 def fmt_chg(v, decimals=2):
     if v is None:
         return "N/A"
@@ -457,16 +596,16 @@ def verdict_text(s):
 
 
 def stat_cells(s):
-    def m(v, pre="", suf="", dec=2):
-        return fmt_num(v, pre, suf, dec) if v is not None else "N/A"
+    def m(v, pre="", suf="", decimals=2):
+        return fmt_num(v, pre, suf, decimals) if v is not None else "N/A"
     return [
         ("MKT CAP", m(s.get("mkt_cap"), "$")),
-        ("P/E TTM", m(s.get("pe"), dec=1)),
-        ("FWD P/E", m(s.get("fwd_pe"), dec=1)),
-        ("P/B", m(s.get("pb"), dec=2)),
-        ("PEG", m(s.get("peg"), dec=2)),
-        ("EV/EBITDA", m(s.get("ev_ebitda"), dec=1)),
-        ("BETA", m(s.get("beta"), dec=2)),
+        ("P/E TTM", m(s.get("pe"), decimals=1)),
+        ("FWD P/E", m(s.get("fwd_pe"), decimals=1)),
+        ("P/B", m(s.get("pb"), decimals=2)),
+        ("PEG", m(s.get("peg"), decimals=2)),
+        ("EV/EBITDA", m(s.get("ev_ebitda"), decimals=1)),
+        ("BETA", m(s.get("beta"), decimals=2)),
         ("DIV YLD", fmt_pct(s.get("dividend_yield")) if s.get("dividend_yield") else "N/A"),
         ("52W HIGH", m(s.get("high_52"), "$")),
         ("52W LOW", m(s.get("low_52"), "$")),
@@ -476,10 +615,10 @@ def stat_cells(s):
         ("EARN GR (YOY)", fmt_pct(s.get("earnings_growth")) if s.get("earnings_growth") is not None else "N/A"),
         ("PROFIT MARGIN", fmt_pct(s.get("profit_margin")) if s.get("profit_margin") is not None else "N/A"),
         ("ROE", fmt_pct(s.get("roe")) if s.get("roe") is not None else "N/A"),
-        ("DEBT/EQUITY", m(s.get("de"), dec=0)),
-        ("CURR RATIO", m(s.get("current_ratio"), dec=2)),
-        ("VOLUME", m(s.get("volume"), dec=0)),
-        ("AVG VOLUME", m(s.get("avg_volume"), dec=0)),
+        ("DEBT/EQUITY", m(s.get("de"), decimals=0)),
+        ("CURR RATIO", m(s.get("current_ratio"), decimals=2)),
+        ("VOLUME", m(s.get("volume"), decimals=0)),
+        ("AVG VOLUME", m(s.get("avg_volume"), decimals=0)),
     ]
 
 
@@ -516,7 +655,7 @@ def detail_panel(s):
               f'<tbody>{q_rows}</tbody></table></div>') if q_rows else ""
     med = s.get("sector_medians", {})
     med_line = (f'<div class="hint">SECTOR MEDIAN [{s["sector"]}]: '
-                f'P/E {fmt_num(med.get("pe"), dec=1)} · P/B {fmt_num(med.get("pb"), dec=2)} · '
+                f'P/E {fmt_num(med.get("pe"), decimals=1)} · P/B {fmt_num(med.get("pb"), decimals=2)} · '
                 f'MARGIN {fmt_pct(med.get("profit_margin"))} · ROE {fmt_pct(med.get("roe"))}</div>')
     return f'''
 <div class="dpanel" id="d-{t}">
@@ -590,7 +729,7 @@ def generate_html(stocks, indices):
                 f'<td data-v="{dcp if dcp is not None else -999999}" class="{cls}">{tri(dcp)} {fmt_chg(dcp)}</td>'
                 f'<td>{spark_svg(s.get("prices_12m", []))}</td>'
                 f'<td data-v="{mcv}" class="dim">{fmt_num(s.get("mkt_cap"), "$")}</td>'
-                f'<td data-v="{pev}" class="dim">{fmt_num(s.get("pe"), dec=1) if s.get("pe") else "N/A"}</td>'
+                f'<td data-v="{pev}" class="dim">{fmt_num(s.get("pe"), decimals=1) if s.get("pe") else "N/A"}</td>'
                 f'<td class="dim">{hi}</td><td class="dim">{lo}</td>'
                 f'<td data-v="{s["total_score"]}" style="font-weight:700;color:{s["badge_color"]}">{s["total_score"]}</td>'
                 f'<td class="l"><span class="rtg" style="color:{s["badge_color"]}">{s["badge_label"].upper()}</span></td>'
