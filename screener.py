@@ -124,6 +124,16 @@ def fetch_all_data():
                 monthly = hist["Close"].resample("W").last().dropna()
                 prices_12m = [round(float(p), 2) for p in monthly.values[-52:]]
 
+            day_chg = None
+            day_chg_pct = None
+            if len(hist) > 1:
+                _last = float(hist["Close"].iloc[-1])
+                _prev = float(hist["Close"].iloc[-2])
+                day_chg = _last - _prev
+                day_chg_pct = pct(_last, _prev)
+            volume = safe(info.get("volume")) or safe(info.get("regularMarketVolume"))
+            avg_volume = safe(info.get("averageVolume")) or safe(info.get("averageDailyVolume10Day"))
+
             ret_3m = None
             ret_6m = None
             ret_1m = None
@@ -176,6 +186,10 @@ def fetch_all_data():
                 "ret_1m": ret_1m,
                 "ret_3m": ret_3m,
                 "ret_6m": ret_6m,
+                "day_chg": day_chg,
+                "day_chg_pct": day_chg_pct,
+                "volume": volume,
+                "avg_volume": avg_volume,
                 "prices_12m": prices_12m,
                 "quarterly": quarterly_data,
             }
@@ -195,9 +209,29 @@ def fetch_all_data():
                 "dividend_yield": None, "high_52": None, "low_52": None,
                 "ma_50": None, "ma_200": None,
                 "ret_1m": None, "ret_3m": None, "ret_6m": None,
+                "day_chg": None, "day_chg_pct": None,
+                "volume": None, "avg_volume": None,
                 "prices_12m": [], "quarterly": [],
             }
     return stocks
+
+
+def fetch_indices():
+    print("Fetching market indices...")
+    out = {}
+    for sym, name in [("^GSPC", "SPX"), ("^IXIC", "CCMP"), ("^DJI", "INDU"), ("^RUT", "RTY"), ("^VIX", "VIX")]:
+        try:
+            h = yf.Ticker(sym).history(period="5d")
+            if len(h) >= 2:
+                last = float(h["Close"].iloc[-1])
+                prev = float(h["Close"].iloc[-2])
+                out[name] = {"price": last, "chg": last - prev, "chg_pct": pct(last, prev)}
+            elif len(h) == 1:
+                out[name] = {"price": float(h["Close"].iloc[-1]), "chg": 0.0, "chg_pct": 0.0}
+            print(f"  {name}... OK")
+        except Exception as e:
+            print(f"  {name}... ERROR: {e}")
+    return out
 
 
 def compute_sector_medians(stocks):
@@ -310,472 +344,340 @@ def color_tag(val, thresholds=(0, 20, 50), invert=False):
     return "#ef4444"
 
 
-def svg_price_chart(prices, width=600, height=160):
+def fmt_chg(v, decimals=2):
+    if v is None:
+        return "N/A"
+    return f"{v:+.{decimals}f}%"
+
+
+def chg_cls(v):
+    if v is None:
+        return "dim"
+    return "up" if v > 0 else "dn" if v < 0 else "dim"
+
+
+def tri(v):
+    if v is None or v == 0:
+        return ""
+    return "▲" if v > 0 else "▼"
+
+
+def spark_svg(prices, w=110, h=26):
     if not prices or len(prices) < 2:
-        return '<svg width="600" height="160"><text x="300" y="80" fill="#6b7280" text-anchor="middle" font-family="DM Sans">No price data</text></svg>'
-    mn = min(prices)
-    mx = max(prices)
+        return ""
+    mn, mx = min(prices), max(prices)
     rng = mx - mn if mx != mn else 1
-    pad = 10
-    w = width - 2 * pad
-    h = height - 2 * pad
-    points = []
+    pts = []
     for i, p in enumerate(prices):
-        x = pad + (i / (len(prices) - 1)) * w
-        y = pad + h - ((p - mn) / rng) * h
-        points.append(f"{x:.1f},{y:.1f}")
-    path = "M" + "L".join(points)
-    fill_path = path + f"L{pad + w:.1f},{pad + h:.1f}L{pad:.1f},{pad + h:.1f}Z"
-    start_p = prices[0]
-    end_p = prices[-1]
-    line_color = "#22c55e" if end_p >= start_p else "#ef4444"
-    grad_id = f"grad_{hash(tuple(prices)) % 99999}"
-    return f'''<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" xmlns="http://www.w3.org/2000/svg">
-  <defs><linearGradient id="{grad_id}" x1="0" y1="0" x2="0" y2="1">
-    <stop offset="0%" stop-color="{line_color}" stop-opacity="0.3"/>
-    <stop offset="100%" stop-color="{line_color}" stop-opacity="0.02"/>
-  </linearGradient></defs>
-  <path d="{fill_path}" fill="url(#{grad_id})" />
-  <path d="{path}" fill="none" stroke="{line_color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="{pad}" y="{height - 2}" fill="#6b7280" font-size="11" font-family="JetBrains Mono">${start_p:,.0f}</text>
-  <text x="{width - pad}" y="{height - 2}" fill="#6b7280" font-size="11" font-family="JetBrains Mono" text-anchor="end">${end_p:,.0f}</text>
-</svg>'''
+        x = 2 + (i / (len(prices) - 1)) * (w - 4)
+        y = 2 + (h - 4) - ((p - mn) / rng) * (h - 4)
+        pts.append(f"{x:.1f},{y:.1f}")
+    up = prices[-1] >= prices[0]
+    c = "#3ddc84" if up else "#ff5252"
+    return (f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">'
+            f'<polyline points="{" ".join(pts)}" fill="none" stroke="{c}" stroke-width="1.5"/></svg>')
 
 
-def generate_stock_card(s):
-    score = s["total_score"]
-    badge_label = s["badge_label"]
-    badge_color = s["badge_color"]
-    zone = s["zone"]
+def term_chart(prices, w=1040, h=230):
+    if not prices or len(prices) < 2:
+        return '<div class="dim">NO PRICE DATA</div>'
+    mn, mx = min(prices), max(prices)
+    rng = mx - mn if mx != mn else 1
+    pad_l, pad_r, pad_t, pad_b = 8, 64, 10, 18
+    iw, ih = w - pad_l - pad_r, h - pad_t - pad_b
+    pts = []
+    for i, p in enumerate(prices):
+        x = pad_l + (i / (len(prices) - 1)) * iw
+        y = pad_t + ih - ((p - mn) / rng) * ih
+        pts.append((x, y))
+    line = "M" + "L".join(f"{x:.1f},{y:.1f}" for x, y in pts)
+    area = line + f"L{pad_l+iw:.1f},{pad_t+ih:.1f}L{pad_l:.1f},{pad_t+ih:.1f}Z"
+    up = prices[-1] >= prices[0]
+    c = "#ffa02f" if up else "#ff5252"
+    grid = "".join(
+        f'<line x1="{pad_l}" y1="{pad_t+ih*i/4:.1f}" x2="{pad_l+iw}" y2="{pad_t+ih*i/4:.1f}" stroke="#1b1b1b" stroke-width="1"/>'
+        for i in range(5))
+    hi_y = pad_t + ih - ((mx - mn) / rng) * ih
+    lo_y = pad_t + ih - ((mn - mn) / rng) * ih
+    return (f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" style="width:100%;height:auto">'
+            f"{grid}"
+            f'<path d="{area}" fill="{c}" opacity="0.08"/>'
+            f'<path d="{line}" fill="none" stroke="{c}" stroke-width="2"/>'
+            f'<text x="{pad_l+iw+6}" y="{hi_y+4:.1f}" fill="#7c7c7c" font-size="11" font-family="monospace">${mx:,.0f}</text>'
+            f'<text x="{pad_l+iw+6}" y="{lo_y+4:.1f}" fill="#7c7c7c" font-size="11" font-family="monospace">${mn:,.0f}</text>'
+            f'<text x="{pad_l}" y="{h-4}" fill="#7c7c7c" font-size="11" font-family="monospace">52W WEEKLY</text>'
+            "</svg>")
 
-    zone_colors = {"red": "#ef4444", "amber": "#f97316", "gold": "#fbbf24", "green": "#22c55e"}
-    zone_c = zone_colors.get(zone, "#6b7280")
 
-    pe_color = color_tag(s.get("pe"), (15, 25, 999), invert=True)
-    pb_color = color_tag(s.get("pb"), (1, 5, 999), invert=True)
-    peg_color = color_tag(s.get("peg"), (0.5, 1.5, 999), invert=True)
-
-    rev_g_val = s.get("rev_growth")
-    rev_g_color = color_tag(rev_g_val * 100 if rev_g_val else None, (0, 10, 25))
-    pm_val = s.get("profit_margin")
-    pm_color = color_tag(pm_val * 100 if pm_val else None, (0, 10, 20))
-    roe_val = s.get("roe")
-    roe_color = color_tag(roe_val * 100 if roe_val else None, (0, 10, 20))
-
-    medians = s.get("sector_medians", {})
-
-    def median_cmp(val, med_key, fmt_fn, invert=False):
-        med = medians.get(med_key)
-        if val is None or med is None:
-            return ""
-        diff_sym = "▲" if (val < med if invert else val > med) else "▼"
-        diff_c = "#22c55e" if diff_sym == "▲" else "#ef4444"
-        return f'<span style="color:{diff_c};font-size:12px;margin-left:6px" title="Sector median: {fmt_fn(med)}">{diff_sym} vs median</span>'
-
-    chart_svg = svg_price_chart(s.get("prices_12m", []))
-
-    quarterly_html = ""
-    for q in s.get("quarterly", []):
-        rev_q = q.get("revenue")
-        ni_q = q.get("net_income")
-        row_color = "#1a2e1a" if ni_q and ni_q > 0 else "#2e1a1a" if ni_q and ni_q < 0 else "#12131a"
-        quarterly_html += f'''<tr style="background:{row_color}">
-          <td style="padding:10px;font-family:JetBrains Mono;font-size:14px">{q["quarter"]}</td>
-          <td style="padding:10px;font-family:JetBrains Mono;font-size:14px">{fmt_num(rev_q, "$")}</td>
-          <td style="padding:10px;font-family:JetBrains Mono;font-size:14px">{fmt_num(ni_q, "$")}</td>
-          <td style="padding:10px;font-family:JetBrains Mono;font-size:14px">{fmt_num(q.get("gross_profit"), "$")}</td>
-        </tr>'''
-
-    catalysts = []
-    risks = []
+def model_lists(s):
+    catalysts, risks = [], []
     if s.get("rev_growth") and s["rev_growth"] > 0.15:
-        catalysts.append(("Strong Revenue Growth", "HIGH IMPACT"))
+        catalysts.append(("STRONG REVENUE GROWTH", "HIGH"))
     if s.get("earnings_growth") and s["earnings_growth"] > 0.20:
-        catalysts.append(("Earnings Acceleration", "HIGH IMPACT"))
+        catalysts.append(("EARNINGS ACCELERATION", "HIGH"))
     if s.get("ma_50") and s.get("ma_200") and s["ma_50"] > s["ma_200"]:
-        catalysts.append(("Golden Cross (50 > 200 MA)", "MEDIUM"))
+        catalysts.append(("GOLDEN CROSS 50D>200D", "MED"))
     if s.get("ret_3m") and s["ret_3m"] > 15:
-        catalysts.append(("Strong 3M Momentum", "MEDIUM"))
+        catalysts.append(("STRONG 3M MOMENTUM", "MED"))
     if s.get("roe") and s["roe"] > 0.20:
-        catalysts.append(("High Return on Equity", "MEDIUM"))
-
+        catalysts.append(("HIGH RETURN ON EQUITY", "MED"))
     if s.get("pe") and s["pe"] > 60:
-        risks.append(("Elevated Valuation (P/E)", "HIGH IMPACT"))
+        risks.append(("ELEVATED VALUATION (P/E)", "HIGH"))
     if s.get("de") and s["de"] > 200:
-        risks.append(("High Debt-to-Equity", "HIGH IMPACT"))
+        risks.append(("HIGH DEBT-TO-EQUITY", "HIGH"))
     if s.get("beta") and s["beta"] > 1.5:
-        risks.append(("High Volatility (Beta)", "MEDIUM"))
+        risks.append(("HIGH VOLATILITY (BETA)", "MED"))
     if s.get("ret_3m") and s["ret_3m"] < -10:
-        risks.append(("Negative 3M Momentum", "HIGH IMPACT"))
+        risks.append(("NEGATIVE 3M MOMENTUM", "HIGH"))
     if s.get("profit_margin") and s["profit_margin"] < 0:
-        risks.append(("Unprofitable", "HIGH IMPACT"))
+        risks.append(("UNPROFITABLE", "HIGH"))
     if s.get("peg") and s["peg"] > 2.5:
-        risks.append(("Overpriced vs Growth (PEG)", "MEDIUM"))
-
+        risks.append(("OVERPRICED VS GROWTH (PEG)", "MED"))
     if not catalysts:
-        catalysts.append(("Stable Fundamentals", "MEDIUM"))
+        catalysts.append(("STABLE FUNDAMENTALS", "MED"))
     if not risks:
-        risks.append(("No Major Red Flags", "LOW"))
+        risks.append(("NO MAJOR RED FLAGS", "LOW"))
+    return catalysts, risks
 
-    catalyst_html = ""
-    for label, severity in catalysts:
-        sev_color = "#22c55e" if severity == "HIGH IMPACT" else "#fbbf24"
-        catalyst_html += f'<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#111827;border-radius:8px;margin-bottom:6px"><span style="color:#d1d5db;font-size:14px">{label}</span><span style="color:{sev_color};font-size:11px;font-weight:700;padding:3px 8px;border:1px solid {sev_color};border-radius:4px">{severity}</span></div>'
 
-    risk_html = ""
-    for label, severity in risks:
-        sev_color = "#ef4444" if severity == "HIGH IMPACT" else "#f97316" if severity == "MEDIUM" else "#6b7280"
-        risk_html += f'<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#111827;border-radius:8px;margin-bottom:6px"><span style="color:#d1d5db;font-size:14px">{label}</span><span style="color:{sev_color};font-size:11px;font-weight:700;padding:3px 8px;border:1px solid {sev_color};border-radius:4px">{severity}</span></div>'
-
-    verdict_text = f"{s['name']} scores {score}/100."
+def verdict_text(s):
+    score = s["total_score"]
+    t = f"{s['name']} scores {score}/100. "
     if score >= 75:
-        verdict_text += " Strong fundamentals with solid momentum. Attractive entry point."
+        t += "Strong fundamentals with solid momentum. Attractive entry."
     elif score >= 60:
-        verdict_text += " Good overall profile. Consider on pullbacks."
+        t += "Good overall profile. Consider on pullbacks."
     elif score >= 45:
-        verdict_text += " Mixed signals. Watch for catalyst before entering."
+        t += "Mixed signals. Wait for a catalyst."
     elif score >= 30:
-        verdict_text += " Elevated risk profile. Wait for improvement in fundamentals."
+        t += "Elevated risk. Wait for fundamental improvement."
     else:
-        verdict_text += " Significant headwinds. Avoid until conditions improve."
+        t += "Significant headwinds. Avoid until conditions improve."
+    return t
 
+
+def stat_cells(s):
+    def m(v, pre="", suf="", dec=2):
+        return fmt_num(v, pre, suf, dec) if v is not None else "N/A"
+    return [
+        ("MKT CAP", m(s.get("mkt_cap"), "$")),
+        ("P/E TTM", m(s.get("pe"), dec=1)),
+        ("FWD P/E", m(s.get("fwd_pe"), dec=1)),
+        ("P/B", m(s.get("pb"), dec=2)),
+        ("PEG", m(s.get("peg"), dec=2)),
+        ("EV/EBITDA", m(s.get("ev_ebitda"), dec=1)),
+        ("BETA", m(s.get("beta"), dec=2)),
+        ("DIV YLD", fmt_pct(s.get("dividend_yield")) if s.get("dividend_yield") else "N/A"),
+        ("52W HIGH", m(s.get("high_52"), "$")),
+        ("52W LOW", m(s.get("low_52"), "$")),
+        ("50D MA", m(s.get("ma_50"), "$")),
+        ("200D MA", m(s.get("ma_200"), "$")),
+        ("REV GR (YOY)", fmt_pct(s.get("rev_growth")) if s.get("rev_growth") is not None else "N/A"),
+        ("EARN GR (YOY)", fmt_pct(s.get("earnings_growth")) if s.get("earnings_growth") is not None else "N/A"),
+        ("PROFIT MARGIN", fmt_pct(s.get("profit_margin")) if s.get("profit_margin") is not None else "N/A"),
+        ("ROE", fmt_pct(s.get("roe")) if s.get("roe") is not None else "N/A"),
+        ("DEBT/EQUITY", m(s.get("de"), dec=0)),
+        ("CURR RATIO", m(s.get("current_ratio"), dec=2)),
+        ("VOLUME", m(s.get("volume"), dec=0)),
+        ("AVG VOLUME", m(s.get("avg_volume"), dec=0)),
+    ]
+
+
+def detail_panel(s):
+    t = s["ticker"]
+    dc, dcp = s.get("day_chg"), s.get("day_chg_pct")
+    cls = chg_cls(dcp)
+    price = f"${s['price']:,.2f}" if s.get("price") else "N/A"
+    chg_txt = f"{dc:+,.2f} ({fmt_chg(dcp)}) {tri(dcp)}" if dc is not None else "N/A"
+    stats = "".join(
+        f'<div class="stat"><div class="k">{k}</div><div class="v">{v}</div></div>'
+        for k, v in stat_cells(s))
+    bars = "".join(
+        f'<div class="mrow"><span class="bl">{label}</span>'
+        f'<div class="mbar"><i style="width:{val}%;background:{"#ffa02f" if val>=60 else "#7c7c7c"}"></i></div>'
+        f'<span class="nv">{val}</span></div>'
+        for label, val in [("VALUATION 35%", s["val_score"]),
+                           ("HEALTH+GROWTH 35%", s["health_score"]),
+                           ("MOMENTUM 30%", s["momentum_score"])])
+    catalysts, risks = model_lists(s)
+    cat_html = "".join(
+        f'<div class="ci"><span class="up">+ {label}</span><span class="sev" style="color:{"#3ddc84" if sev=="HIGH" else "#ffa02f"}">{sev}</span></div>'
+        for label, sev in catalysts)
+    risk_html = "".join(
+        f'<div class="ci"><span class="dn">- {label}</span><span class="sev" style="color:{"#ff5252" if sev=="HIGH" else "#ffa02f" if sev=="MED" else "#7c7c7c"}">{sev}</span></div>'
+        for label, sev in risks)
+    q_rows = ""
+    for q in s.get("quarterly", []):
+        q_rows += (f'<tr><td>{q["quarter"]}</td><td>{fmt_num(q.get("revenue"), "$")}</td>'
+                   f'<td>{fmt_num(q.get("net_income"), "$")}</td>'
+                   f'<td>{fmt_num(q.get("gross_profit"), "$")}</td></tr>')
+    q_html = (f'<div class="d-sec"><div class="d-sec-t">EARNINGS TREND — QUARTERLY</div>'
+              f'<table class="q"><thead><tr><th>QUARTER</th><th>REVENUE</th><th>NET INCOME</th><th>GROSS PROFIT</th></tr></thead>'
+              f'<tbody>{q_rows}</tbody></table></div>') if q_rows else ""
+    med = s.get("sector_medians", {})
+    med_line = (f'<div class="hint">SECTOR MEDIAN [{s["sector"]}]: '
+                f'P/E {fmt_num(med.get("pe"), dec=1)} · P/B {fmt_num(med.get("pb"), dec=2)} · '
+                f'MARGIN {fmt_pct(med.get("profit_margin"))} · ROE {fmt_pct(med.get("roe"))}</div>')
     return f'''
-    <div class="stock-card" id="card-{s["ticker"]}">
-      <!-- HERO STRIP -->
-      <div style="display:flex;align-items:center;gap:16px;padding:24px 28px;background:linear-gradient(135deg,#111827,#1f2937);border-radius:16px 16px 0 0;flex-wrap:wrap">
-        <span style="font-family:Playfair Display;font-size:32px;font-weight:700;color:#f9fafb">{s["ticker"]}</span>
-        <span style="font-size:15px;color:#9ca3af;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{s["name"]}</span>
-        <span style="font-family:JetBrains Mono;font-size:28px;font-weight:700;color:#f9fafb;margin-left:auto">{score}</span>
-        <span style="font-size:13px;color:#9ca3af">/100</span>
-        <span style="padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;color:#000;background:{badge_color}">{badge_label}</span>
-        <button onclick="copyCard('{s["ticker"]}')" style="margin-left:8px;background:none;border:1px solid #374151;color:#9ca3af;padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px" title="Copy to clipboard">📋</button>
-      </div>
-
-      <!-- SCORE BAR -->
-      <div style="padding:0 28px;background:#111827">
-        <div style="position:relative;height:28px;border-radius:14px;overflow:hidden;background:linear-gradient(to right,#ef4444 0%,#ef4444 30%,#f97316 30%,#f97316 45%,#fbbf24 45%,#fbbf24 60%,#22c55e 60%,#22c55e 100%)">
-          <div style="position:absolute;left:{score}%;top:0;transform:translateX(-50%);width:4px;height:100%;background:#fff;border-radius:2px;box-shadow:0 0 8px rgba(255,255,255,0.8)"></div>
-          <div style="position:absolute;left:{score}%;top:-2px;transform:translateX(-50%);font-size:11px;color:#fff;font-weight:700;text-shadow:0 1px 3px #000">{score}</div>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:11px;color:#6b7280">
-          <span>Sell</span><span>Cautious</span><span>Hold</span><span>Buy</span><span>Strong Buy</span>
-        </div>
-      </div>
-
-      <!-- PAGE 1 -->
-      <div style="padding:20px 28px;background:#0d1117">
-        <!-- KPI STRIP -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:20px">
-          <div class="kpi"><span class="kpi-label">Price</span><span class="kpi-val">{f'${s["price"]:,.2f}' if s["price"] else "N/A"}</span></div>
-          <div class="kpi"><span class="kpi-label">Mkt Cap</span><span class="kpi-val">{fmt_num(s["mkt_cap"], "$")}</span></div>
-          <div class="kpi"><span class="kpi-label">P/E</span><span class="kpi-val">{fmt_num(s["pe"], decimals=1) if s["pe"] else "N/A"}</span></div>
-          <div class="kpi"><span class="kpi-label">Beta</span><span class="kpi-val">{fmt_num(s["beta"], decimals=2) if s["beta"] else "N/A"}</span></div>
-          <div class="kpi"><span class="kpi-label">Div Yield</span><span class="kpi-val">{fmt_pct(s["dividend_yield"]) if s["dividend_yield"] else "N/A"}</span></div>
-          <div class="kpi"><span class="kpi-label">52W Range</span><span class="kpi-val">{fmt_num(s["low_52"], "$", decimals=0)}-{fmt_num(s["high_52"], "$", decimals=0)}</span></div>
-        </div>
-
-        <!-- 12-MONTH CHART -->
-        <div style="background:#111827;border-radius:12px;padding:16px;margin-bottom:20px">
-          <div style="font-family:Playfair Display;font-size:16px;color:#d1d5db;margin-bottom:8px">12-Month Price Chart</div>
-          {chart_svg}
-        </div>
-
-        <!-- 6-CARD GRID -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-bottom:16px">
-          <!-- Valuation Cards -->
-          <div class="metric-card">
-            <div class="metric-header">P/E Ratio <span class="tag" style="background:{pe_color}">{fmt_num(s["pe"], decimals=1)}</span></div>
-            <div class="metric-sub">Forward P/E: {fmt_num(s["fwd_pe"], decimals=1)}{median_cmp(s.get("pe"), "pe", lambda v: f"{v:.1f}", invert=True)}</div>
-            <details class="explainer"><summary>What is P/E?</summary><p>Price-to-Earnings ratio shows how much investors pay per dollar of earnings. Lower = cheaper relative to earnings.</p></details>
-          </div>
-          <div class="metric-card">
-            <div class="metric-header">P/B Ratio <span class="tag" style="background:{pb_color}">{fmt_num(s["pb"], decimals=2)}</span></div>
-            <div class="metric-sub">Book value comparison{median_cmp(s.get("pb"), "pb", lambda v: f"{v:.2f}", invert=True)}</div>
-            <details class="explainer"><summary>What is P/B?</summary><p>Price-to-Book compares market price to net asset value. Below 1.0 may indicate undervaluation.</p></details>
-          </div>
-          <div class="metric-card">
-            <div class="metric-header">PEG Ratio <span class="tag" style="background:{peg_color}">{fmt_num(s["peg"], decimals=2)}</span></div>
-            <div class="metric-sub">Growth-adjusted valuation{median_cmp(s.get("peg"), "peg", lambda v: f"{v:.2f}", invert=True)}</div>
-            <details class="explainer"><summary>What is PEG?</summary><p>PEG adjusts P/E for growth rate. Below 1.0 suggests undervalued relative to growth.</p></details>
-          </div>
-
-          <!-- Health & Growth Cards -->
-          <div class="metric-card">
-            <div class="metric-header">Revenue Growth <span class="tag" style="background:{rev_g_color}">{fmt_pct(s["rev_growth"])}</span></div>
-            <div class="metric-sub">Year-over-year{median_cmp(s.get("rev_growth"), "profit_margin", lambda v: f"{v*100:.1f}%") if s.get("rev_growth") else ""}</div>
-            <details class="explainer"><summary>Why it matters</summary><p>Revenue growth shows how fast the business is expanding. Consistent growth above 15% is strong.</p></details>
-          </div>
-          <div class="metric-card">
-            <div class="metric-header">Profit Margin <span class="tag" style="background:{pm_color}">{fmt_pct(s["profit_margin"])}</span></div>
-            <div class="metric-sub">Net margin{median_cmp(s.get("profit_margin"), "profit_margin", lambda v: f"{v*100:.1f}%")}</div>
-            <details class="explainer"><summary>Why it matters</summary><p>Profit margin shows how much of each revenue dollar becomes profit. Higher = more efficient.</p></details>
-          </div>
-          <div class="metric-card">
-            <div class="metric-header">ROE <span class="tag" style="background:{roe_color}">{fmt_pct(s["roe"])}</span></div>
-            <div class="metric-sub">Return on equity{median_cmp(s.get("roe"), "roe", lambda v: f"{v*100:.1f}%")}</div>
-            <details class="explainer"><summary>Why it matters</summary><p>ROE measures how effectively the company uses shareholders' money to generate profit. Above 15% is good.</p></details>
-          </div>
-        </div>
-
-        <!-- SECTOR MEDIAN ROW -->
-        <div style="background:#111827;border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;gap:20px;flex-wrap:wrap;font-size:13px;color:#9ca3af">
-          <span style="font-weight:600;color:#d1d5db">Sector Median ({s["sector"]}):</span>
-          <span>P/E {fmt_num(medians.get("pe"), decimals=1)}</span>
-          <span>P/B {fmt_num(medians.get("pb"), decimals=2)}</span>
-          <span>Margin {fmt_pct(medians.get("profit_margin"))}</span>
-          <span>ROE {fmt_pct(medians.get("roe"))}</span>
-        </div>
-
-        <!-- SCORE BREAKDOWN -->
-        <div style="background:#111827;border-radius:12px;padding:16px;margin-bottom:8px">
-          <div style="font-family:Playfair Display;font-size:16px;color:#d1d5db;margin-bottom:12px">Score Breakdown</div>
-          <div class="score-row">
-            <span class="score-label">Valuation (35%)</span>
-            <div class="score-bar-bg"><div class="score-bar-fill" style="width:{s["val_score"]}%;background:#6366f1"></div></div>
-            <span class="score-num">{s["val_score"]}</span>
-          </div>
-          <div class="score-row">
-            <span class="score-label">Health & Growth (35%)</span>
-            <div class="score-bar-bg"><div class="score-bar-fill" style="width:{s["health_score"]}%;background:#8b5cf6"></div></div>
-            <span class="score-num">{s["health_score"]}</span>
-          </div>
-          <div class="score-row">
-            <span class="score-label">Momentum (30%)</span>
-            <div class="score-bar-bg"><div class="score-bar-fill" style="width:{s["momentum_score"]}%;background:#a78bfa"></div></div>
-            <span class="score-num">{s["momentum_score"]}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- PAGE 2 -->
-      <div style="padding:20px 28px;background:#0a0c12;border-radius:0 0 16px 16px">
-        <!-- QUARTERLY TREND TABLE -->
-        {f"""<div style="margin-bottom:20px">
-          <div style="font-family:Playfair Display;font-size:16px;color:#d1d5db;margin-bottom:10px">Quarterly Trends</div>
-          <table style="width:100%;border-collapse:collapse;border-radius:10px;overflow:hidden">
-            <thead><tr style="background:#1f2937">
-              <th style="padding:10px;text-align:left;color:#9ca3af;font-size:13px">Quarter</th>
-              <th style="padding:10px;text-align:left;color:#9ca3af;font-size:13px">Revenue</th>
-              <th style="padding:10px;text-align:left;color:#9ca3af;font-size:13px">Net Income</th>
-              <th style="padding:10px;text-align:left;color:#9ca3af;font-size:13px">Gross Profit</th>
-            </tr></thead>
-            <tbody>{quarterly_html}</tbody>
-          </table>
-        </div>""" if quarterly_html else ""}
-
-        <!-- CATALYSTS vs RISKS -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
-          <div>
-            <div style="font-family:Playfair Display;font-size:16px;color:#22c55e;margin-bottom:10px">Catalysts</div>
-            {catalyst_html}
-          </div>
-          <div>
-            <div style="font-family:Playfair Display;font-size:16px;color:#ef4444;margin-bottom:10px">Risks</div>
-            {risk_html}
-          </div>
-        </div>
-
-        <!-- BOTTOM LINE -->
-        <div style="background:linear-gradient(135deg,#111827,#1e293b);border-radius:12px;padding:20px;border-left:4px solid {badge_color}">
-          <div style="font-family:Playfair Display;font-size:18px;color:#f9fafb;margin-bottom:8px">Bottom Line</div>
-          <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
-            <div style="background:#1f2937;border-radius:8px;padding:8px 16px;flex-shrink:0">
-              <span style="font-family:JetBrains Mono;font-size:24px;font-weight:700;color:{badge_color}">{score}</span>
-              <span style="color:#6b7280;font-size:13px">/100</span>
-            </div>
-            <div style="flex:1;height:8px;border-radius:4px;background:linear-gradient(to right,#ef4444,#f97316,#fbbf24,#22c55e);position:relative">
-              <div style="position:absolute;left:{score}%;top:-4px;width:16px;height:16px;border-radius:50%;background:{badge_color};border:2px solid #fff;transform:translateX(-50%)"></div>
-            </div>
-            <span style="padding:6px 14px;border-radius:20px;font-size:14px;font-weight:700;color:#000;background:{badge_color}">{badge_label}</span>
-          </div>
-          <p style="color:#d1d5db;font-size:14px;line-height:1.6;margin:0">{verdict_text}</p>
-        </div>
-      </div>
-    </div>'''
+<div class="dpanel" id="d-{t}">
+  <div class="d-head"><span>{t}</span><span class="nm">{s["name"]} · {s["industry"] or s["sector"]}</span><button onclick="closeD()">ESC</button></div>
+  <div class="d-sec">
+    <div class="d-price">{price}<span class="chg {cls}">{chg_txt}</span></div>
+    <div class="hint">DAY RANGE SNAPSHOT · 52-WEEK WEEKLY SERIES</div>
+    <div style="margin-top:10px">{term_chart(s.get("prices_12m", []))}</div>
+  </div>
+  <div class="d-sec"><div class="d-sec-t">DESCRIPTIVE STATISTICS</div><div class="stat-grid">{stats}</div>{med_line}</div>
+  <div class="d-sec"><div class="d-sec-t">QUANT MODEL — SCORE {s["total_score"]}/100 <span class="rtg" style="color:{s["badge_color"]}">{s["badge_label"].upper()}</span></div>
+    {bars}
+    <div class="verdict" style="margin-top:12px">{verdict_text(s)}</div>
+  </div>
+  <div class="d-sec"><div class="d-sec-t">CATALYSTS / RISKS</div>
+    <div class="d2"><div>{cat_html}</div><div>{risk_html}</div></div>
+  </div>
+  {q_html}
+</div>'''
 
 
-def generate_html(stocks):
-    now = datetime.now().strftime("%B %d, %Y at %I:%M %p")
-    sorted_stocks = sorted(stocks.values(), key=lambda s: s.get("total_score", 0), reverse=True)
-    best = sorted_stocks[0] if sorted_stocks else None
+def generate_html(stocks, indices):
+    now = datetime.now()
+    now_str = now.strftime("%d-%b-%Y %H:%M ET").upper()
+    sorted_stocks = sorted(stocks.values(), key=lambda x: x.get("total_score", 0), reverse=True)
 
-    sector_nav = ""
+    # ticker tape (doubled for seamless loop)
+    tape_items = []
+    for s in sorted(stocks.values(), key=lambda x: x["ticker"]):
+        if s.get("price") is None:
+            continue
+        cls = chg_cls(s.get("day_chg_pct"))
+        tape_items.append(
+            f'<span class="titem"><b>{s["ticker"]}</b> {s["price"]:,.2f} '
+            f'<span class="{cls}">{fmt_chg(s.get("day_chg_pct"))} {tri(s.get("day_chg_pct"))}</span></span>')
+    tape = "".join(tape_items)
+
+    # market monitor
+    mkt = ""
+    for name in ["SPX", "CCMP", "INDU", "RTY", "VIX"]:
+        d = indices.get(name)
+        if not d:
+            continue
+        cls = chg_cls(d["chg_pct"]) if name != "VIX" else chg_cls(-d["chg_pct"] if d["chg_pct"] else None)
+        mkt += (f'<div class="mcell"><span class="n">{name}</span>'
+                f'<span class="p">{d["price"]:,.2f}</span> '
+                f'<span class="{cls}">{fmt_chg(d["chg_pct"])}</span></div>')
+
+    # blotter rows grouped by sector
+    rows = ""
     for sector in SECTORS:
-        tickers = SECTORS[sector]
-        sector_nav += f'<div class="sector-group"><div class="sector-title">{sector}</div><div class="sector-tickers">'
+        rows += f'<tr class="sect-hd"><td class="l" colspan="13">▸ {sector.upper()}</td></tr>'
+        for s in sorted_stocks:
+            if s["sector"] != sector:
+                continue
+            dc, dcp = s.get("day_chg"), s.get("day_chg_pct")
+            cls = chg_cls(dcp)
+            price = f"{s['price']:,.2f}" if s.get("price") else "N/A"
+            pv = s["price"] if s.get("price") is not None else -1
+            mcv = s["mkt_cap"] if s.get("mkt_cap") is not None else -1
+            pev = s["pe"] if s.get("pe") is not None else 9999
+            hi = f"{s['high_52']:,.0f}" if s.get("high_52") else "—"
+            lo = f"{s['low_52']:,.0f}" if s.get("low_52") else "—"
+            rows += (
+                f'<tr data-ticker="{s["ticker"]}" data-name="{s["name"]}" onclick="openD(\'{s["ticker"]}\')">'
+                f'<td class="l dim">{s["ticker"]}</td>'
+                f'<td class="l"><span class="ticker">{s["ticker"]}</span></td>'
+                f'<td class="l dim">{s["name"][:28]}</td>'
+                f'<td data-v="{pv}">{price}</td>'
+                f'<td data-v="{dc if dc is not None else -999999}" class="{cls}">{f"{dc:+,.2f}" if dc is not None else "N/A"}</td>'
+                f'<td data-v="{dcp if dcp is not None else -999999}" class="{cls}">{tri(dcp)} {fmt_chg(dcp)}</td>'
+                f'<td>{spark_svg(s.get("prices_12m", []))}</td>'
+                f'<td data-v="{mcv}" class="dim">{fmt_num(s.get("mkt_cap"), "$")}</td>'
+                f'<td data-v="{pev}" class="dim">{fmt_num(s.get("pe"), dec=1) if s.get("pe") else "N/A"}</td>'
+                f'<td class="dim">{hi}</td><td class="dim">{lo}</td>'
+                f'<td data-v="{s["total_score"]}" style="font-weight:700;color:{s["badge_color"]}">{s["total_score"]}</td>'
+                f'<td class="l"><span class="rtg" style="color:{s["badge_color"]}">{s["badge_label"].upper()}</span></td>'
+                "</tr>")
+
+    # top picks
+    picks = ""
+    for i, s in enumerate(sorted_stocks[:10], 1):
+        cls = chg_cls(s.get("day_chg_pct"))
+        picks += (
+            f'<div class="pick" onclick="openD(\'{s["ticker"]}\')">'
+            f'<span class="rk">{i:02d}</span>'
+            f'<span class="ticker">{s["ticker"]}</span>'
+            f'<span class="dim">{s["name"][:34]}</span>'
+            f'<span class="bar"><i style="width:{s["total_score"]}%"></i></span>'
+            f'<span style="font-weight:700;color:{s["badge_color"]}">{s["total_score"]} · {s["badge_label"].upper()}</span>'
+            f'<span class="{cls}">{fmt_chg(s.get("day_chg_pct"))}</span>'
+            "</div>")
+
+    # sectors
+    sec_html = ""
+    for sector, tickers in SECTORS.items():
+        chips = ""
         for t in tickers:
             s = stocks.get(t, {})
             sc = s.get("total_score", 0)
-            bc = s.get("badge_color", "#6b7280")
-            sector_nav += f'<a href="#card-{t}" class="ticker-chip" style="border-color:{bc}">{t} <span style="color:{bc};font-weight:700">{sc}</span></a>'
-        sector_nav += '</div></div>'
+            bc = s.get("badge_color", "#7c7c7c")
+            chips += (f'<div class="chip" onclick="openD(\'{t}\')"><b>{t}</b>'
+                      f'<span class="sc" style="color:{bc}">{sc}</span></div>')
+        sec_html += f'<div class="sect-block"><div class="sect-block-h">{sector.upper()} [{len(tickers)}]</div><div class="chips">{chips}</div></div>'
 
-    cards_html = ""
-    for s in sorted_stocks:
-        cards_html += generate_stock_card(s)
+    panels = "".join(detail_panel(s) for s in sorted_stocks)
 
-    ranking_rows = ""
-    for i, s in enumerate(sorted_stocks):
-        ranking_rows += f'''<tr style="background:{"#111827" if i % 2 == 0 else "#0d1117"}">
-          <td style="padding:10px;font-family:JetBrains Mono;color:#f9fafb;font-size:14px">#{i+1}</td>
-          <td style="padding:10px"><a href="#card-{s["ticker"]}" style="color:#818cf8;text-decoration:none;font-weight:700;font-size:15px">{s["ticker"]}</a></td>
-          <td style="padding:10px;color:#9ca3af;font-size:13px">{s["name"][:25]}</td>
-          <td style="padding:10px;font-family:JetBrains Mono;font-size:14px;color:#f9fafb">{f'${s["price"]:,.2f}' if s["price"] else "N/A"}</td>
-          <td style="padding:10px;text-align:center"><span style="padding:4px 10px;border-radius:12px;font-size:13px;font-weight:700;color:#000;background:{s["badge_color"]}">{s["total_score"]}</span></td>
-          <td style="padding:10px;color:{s["badge_color"]};font-size:13px;font-weight:600">{s["badge_label"]}</td>
-        </tr>'''
-
-    html = f'''<!DOCTYPE html>
+    return f'''<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Stock Risk Screener — {now}</title>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=DM+Sans:wght@400;500;700&family=Playfair+Display:wght@400;700&display=swap" rel="stylesheet">
-<style>
-  * {{ margin:0; padding:0; box-sizing:border-box; }}
-  body {{ background:#08090d; color:#d1d5db; font-family:"DM Sans",sans-serif; line-height:1.5; }}
-  .container {{ max-width:1100px; margin:0 auto; padding:20px 16px; }}
-  h1 {{ font-family:"Playfair Display",serif; font-size:36px; color:#f9fafb; margin-bottom:4px; }}
-  .subtitle {{ color:#6b7280; font-size:14px; margin-bottom:24px; }}
-  .hero-best {{ background:linear-gradient(135deg,#111827 0%,#064e3b 100%); border-radius:16px; padding:28px; margin-bottom:24px; border:1px solid #22c55e33; }}
-  .hero-best-title {{ font-family:"Playfair Display",serif; font-size:14px; color:#22c55e; text-transform:uppercase; letter-spacing:2px; margin-bottom:8px; }}
-  .hero-best-row {{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; }}
-  .hero-best-ticker {{ font-family:"Playfair Display",serif; font-size:42px; font-weight:700; color:#f9fafb; }}
-  .hero-best-score {{ font-family:"JetBrains Mono",monospace; font-size:36px; font-weight:700; color:#22c55e; }}
-
-  .sector-group {{ margin-bottom:12px; }}
-  .sector-title {{ font-family:"Playfair Display",serif; font-size:14px; color:#9ca3af; margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; }}
-  .sector-tickers {{ display:flex; flex-wrap:wrap; gap:8px; }}
-  .ticker-chip {{ display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border:1px solid #374151; border-radius:8px; color:#d1d5db; text-decoration:none; font-size:13px; font-family:"JetBrains Mono",monospace; transition:all 0.2s; }}
-  .ticker-chip:hover {{ background:#1f2937; transform:translateY(-1px); }}
-
-  .stock-card {{ background:#0d1117; border-radius:16px; margin-bottom:24px; border:1px solid #1e293b; overflow:hidden; transition:all 0.3s; }}
-  .stock-card:hover {{ border-color:#374151; box-shadow:0 4px 24px rgba(0,0,0,0.4); }}
-
-  .kpi {{ background:#111827; border-radius:10px; padding:12px 14px; }}
-  .kpi-label {{ display:block; font-size:12px; color:#6b7280; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.5px; }}
-  .kpi-val {{ font-family:"JetBrains Mono",monospace; font-size:22px; font-weight:700; color:#f9fafb; }}
-
-  .metric-card {{ background:#111827; border-radius:12px; padding:16px; }}
-  .metric-header {{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; font-size:15px; color:#d1d5db; font-weight:600; }}
-  .metric-sub {{ font-size:12px; color:#6b7280; }}
-  .tag {{ padding:3px 10px; border-radius:6px; font-family:"JetBrains Mono",monospace; font-size:13px; font-weight:700; color:#000; }}
-
-  .explainer {{ margin-top:8px; }}
-  .explainer summary {{ font-size:12px; color:#6b7280; cursor:pointer; user-select:none; }}
-  .explainer summary:hover {{ color:#9ca3af; }}
-  .explainer p {{ font-size:12px; color:#6b7280; margin-top:4px; padding:8px; background:#0d1117; border-radius:6px; }}
-
-  .score-row {{ display:flex; align-items:center; gap:12px; margin-bottom:8px; }}
-  .score-label {{ font-size:13px; color:#9ca3af; width:160px; flex-shrink:0; }}
-  .score-bar-bg {{ flex:1; height:10px; background:#1f2937; border-radius:5px; overflow:hidden; }}
-  .score-bar-fill {{ height:100%; border-radius:5px; transition:width 0.5s ease; }}
-  .score-num {{ font-family:"JetBrains Mono",monospace; font-size:14px; font-weight:700; color:#f9fafb; width:32px; text-align:right; }}
-
-  .ranking-table {{ width:100%; border-collapse:collapse; border-radius:12px; overflow:hidden; margin-bottom:28px; }}
-  .ranking-table th {{ padding:12px; text-align:left; background:#1f2937; color:#9ca3af; font-size:12px; text-transform:uppercase; letter-spacing:0.5px; }}
-
-  .filter-bar {{ display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }}
-  .filter-btn {{ padding:8px 16px; border-radius:8px; border:1px solid #374151; background:transparent; color:#9ca3af; font-size:13px; cursor:pointer; transition:all 0.2s; }}
-  .filter-btn:hover,.filter-btn.active {{ background:#1f2937; color:#f9fafb; border-color:#6366f1; }}
-
-  @media(max-width:768px) {{
-    .kpi-val {{ font-size:18px; }}
-    .hero-best-ticker {{ font-size:32px; }}
-    h1 {{ font-size:28px; }}
-    .stock-card div[style*="grid-template-columns:1fr 1fr"] {{ grid-template-columns:1fr !important; }}
-  }}
-
-  @keyframes fadeIn {{ from {{ opacity:0; transform:translateY(10px); }} to {{ opacity:1; transform:translateY(0); }} }}
-  .stock-card {{ animation:fadeIn 0.4s ease; }}
-</style>
+<title>EQUITY TERMINAL — {now_str}</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' fill='%23ffa02f'/></svg>">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>{TERM_CSS}</style>
 </head>
 <body>
-<div class="container">
-  <h1>Stock Risk Screener</h1>
-  <div class="subtitle">Generated {now} &bull; {len(ALL_TICKERS)} stocks &bull; 5 sectors &bull; Scores weighted: Valuation 35% / Health & Growth 35% / Momentum 30%</div>
-
-  <!-- BEST STOCK HERO -->
-  {f"""<div class="hero-best">
-    <div class="hero-best-title">&#9733; Best Stock to Buy Today</div>
-    <div class="hero-best-row">
-      <span class="hero-best-ticker">{best["ticker"]}</span>
-      <span style="font-size:18px;color:#d1d5db">{best["name"]}</span>
-      <span class="hero-best-score" style="margin-left:auto">{best["total_score"]}</span>
-      <span style="color:#6b7280;font-size:16px">/100</span>
-      <span style="padding:8px 18px;border-radius:24px;font-size:14px;font-weight:700;color:#000;background:{best["badge_color"]}">{best["badge_label"]}</span>
-    </div>
-    <div style="margin-top:12px;font-size:14px;color:#9ca3af">
-      Price: <span style="color:#f9fafb;font-family:JetBrains Mono">{f'${best["price"]:,.2f}' if best["price"] else "N/A"}</span> &bull;
-      P/E: <span style="color:#f9fafb;font-family:JetBrains Mono">{fmt_num(best["pe"], decimals=1)}</span> &bull;
-      Rev Growth: <span style="color:#f9fafb;font-family:JetBrains Mono">{fmt_pct(best["rev_growth"])}</span> &bull;
-      Sector: <span style="color:#f9fafb">{best["sector"]}</span>
-    </div>
-  </div>""" if best else ""}
-
-  <!-- SECTOR NAV -->
-  <div style="margin-bottom:24px">{sector_nav}</div>
-
-  <!-- FILTER BAR -->
-  <div class="filter-bar">
-    <button class="filter-btn active" onclick="filterCards('all')">All Stocks</button>
-    {"".join(f'<button class="filter-btn" onclick="filterCards(&apos;{s}&apos;)">{s}</button>' for s in SECTORS)}
+<div class="term-top"><span>≡ EQUITY TERMINAL</span><span class="rt"><span class="dot"></span>{now_str} · <span id="clock">--:--:--</span> · FEED OK</span></div>
+<div class="tape-wrap"><div class="tape">{tape}{tape}</div></div>
+<div class="mkt">{mkt}</div>
+<div class="funcbar">
+  <button class="fbtn on" data-tab="all" onclick="tab('all')"><span class="fkey">1</span>ALL SECURITIES</button>
+  <button class="fbtn" data-tab="top" onclick="tab('top')"><span class="fkey">2</span>TOP PICKS</button>
+  <button class="fbtn" data-tab="sec" onclick="tab('sec')"><span class="fkey">3</span>SECTORS</button>
+  <input id="q" class="search" placeholder="TICKER SEARCH  [ / ]" autocomplete="off">
+</div>
+<div class="wrap">
+  <div id="tab-all">
+    <div class="hint">CLICK ROW FOR SECURITY DETAIL · CLICK HEADER TO SORT · {len(sorted_stocks)} SECURITIES</div>
+    <table class="blot">
+      <thead id="blot-head"><tr>
+        <th class="l" data-i="0" data-t="s" onclick="sortBy(this)">TKR</th>
+        <th class="l">TICKER</th><th class="l">SECURITY NAME</th>
+        <th data-i="3" data-t="n" onclick="sortBy(this)">LAST</th>
+        <th data-i="4" data-t="n" onclick="sortBy(this)">NET CHG</th>
+        <th data-i="5" data-t="n" onclick="sortBy(this)">% CHG</th>
+        <th>12M TREND</th>
+        <th data-i="7" data-t="n" onclick="sortBy(this)">MKT CAP</th>
+        <th data-i="8" data-t="n" onclick="sortBy(this)">P/E</th>
+        <th>52W HI</th><th>52W LO</th>
+        <th data-i="11" data-t="n" onclick="sortBy(this)">SCORE</th>
+        <th class="l">RTG</th>
+      </tr></thead>
+      <tbody id="blot-body">{rows}</tbody>
+    </table>
   </div>
-
-  <!-- RANKING TABLE -->
-  <table class="ranking-table">
-    <thead><tr>
-      <th>#</th><th>Ticker</th><th>Name</th><th>Price</th><th>Score</th><th>Rating</th>
-    </tr></thead>
-    <tbody>{ranking_rows}</tbody>
-  </table>
-
-  <!-- STOCK CARDS -->
-  <div id="cards-container">{cards_html}</div>
-
-  <div style="text-align:center;padding:40px;color:#374151;font-size:12px">
-    Generated by Stock Risk Screener &bull; Data via yfinance &bull; Not financial advice
+  <div id="tab-top" style="display:none">
+    <div class="hint">TOP 10 BY QUANT SCORE · CLICK FOR DETAIL</div>
+    {picks}
+  </div>
+  <div id="tab-sec" style="display:none">
+    <div class="hint">COVERAGE UNIVERSE · {len(SECTORS)} SECTORS</div>
+    {sec_html}
   </div>
 </div>
-
-<script>
-const SECTORS = {json.dumps({s: t for s, t in SECTORS.items()})};
-
-function filterCards(sector) {{
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
-  document.querySelectorAll('.stock-card').forEach(card => {{
-    if (sector === 'all') {{ card.style.display = ''; return; }}
-    const ticker = card.id.replace('card-','');
-    const tickers = SECTORS[sector] || [];
-    card.style.display = tickers.includes(ticker) ? '' : 'none';
-  }});
-}}
-
-function copyCard(ticker) {{
-  const card = document.getElementById('card-' + ticker);
-  if (!card) return;
-  const text = card.innerText;
-  navigator.clipboard.writeText(text).then(() => {{
-    const btn = card.querySelector('button');
-    const orig = btn.textContent;
-    btn.textContent = 'Copied!';
-    setTimeout(() => btn.textContent = orig, 1500);
-  }});
-}}
-
-document.querySelectorAll('a[href^="#card-"]').forEach(a => {{
-  a.addEventListener('click', e => {{
-    e.preventDefault();
-    const target = document.querySelector(a.getAttribute('href'));
-    if (target) target.scrollIntoView({{ behavior:'smooth', block:'start' }});
-  }});
-}});
-</script>
+<div class="overlay" id="ovl">{panels}</div>
+<div class="statusbar"><span><b>SRC</b> YFINANCE · <b>GEN</b> {now_str} · <b>UNIVERSE</b> {len(sorted_stocks)} SECURITIES</span><span>EDUCATIONAL USE ONLY — NOT FINANCIAL ADVICE</span></div>
+<script>{TERM_JS}</script>
 </body>
 </html>'''
-    return html
 
 
 def main():
@@ -784,10 +686,11 @@ def main():
     print("=" * 60)
 
     stocks = fetch_all_data()
+    indices = fetch_indices()
     medians = compute_sector_medians(stocks)
     stocks = calculate_scores(stocks, medians)
 
-    html = generate_html(stocks)
+    html = generate_html(stocks, indices)
     out_path = Path(__file__).parent / "index.html"
     out_path.write_text(html, encoding="utf-8")
     print(f"\nDashboard saved to: {out_path}")
