@@ -788,7 +788,7 @@ def main():
     stocks = calculate_scores(stocks, medians)
 
     html = generate_html(stocks)
-    out_path = Path(__file__).parent / "dashboard.html"
+    out_path = Path(__file__).parent / "index.html"
     out_path.write_text(html, encoding="utf-8")
     print(f"\nDashboard saved to: {out_path}")
 
